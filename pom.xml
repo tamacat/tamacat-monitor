@@ -41,7 +41,7 @@
     <!-- Runtime: keep this list short. Every addition needs a reason in docs/DESIGN.md. -->
     <slf4j.version>2.0.20</slf4j.version>
     <tamacat-logging.version>1.0.0</tamacat-logging.version>
-    <mysql-connector.version>26.7.0</mysql-connector.version>
+    <mysql-connector.version>26.10.0</mysql-connector.version>
     <jakarta-json-api.version>2.1.3</jakarta-json-api.version>
     <parsson.version>1.1.9</parsson.version>
     <jstl-api.version>3.0.2</jstl-api.version>
