@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns="https://jakarta.ee/xml/ns/jakartaee"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee https://jakarta.ee/xml/ns/jakartaee/web-app_6_0.xsd"
+         version="6.0">
+
+  <display-name>tamacat-monitor</display-name>
+
+  <!-- Session cookie name / Secure / SameSite are set in AppLifecycleListener -->
+  <session-config>
+    <tracking-mode>COOKIE</tracking-mode>
+  </session-config>
+
+  <jsp-config>
+    <jsp-property-group>
+      <url-pattern>*.jsp</url-pattern>
+      <page-encoding>UTF-8</page-encoding>
+      <scripting-invalid>true</scripting-invalid>
+      <trim-directive-whitespaces>true</trim-directive-whitespaces>
+    </jsp-property-group>
+  </jsp-config>
+
+  <!-- Filter order: security headers, CSRF, authentication -->
+  <filter>
+    <filter-name>securityHeaders</filter-name>
+    <filter-class>org.tamacat.monitor.web.filter.SecurityHeadersFilter</filter-class>
+  </filter>
+  <filter>
+    <filter-name>csrf</filter-name>
+    <filter-class>org.tamacat.monitor.web.filter.CsrfFilter</filter-class>
+  </filter>
+  <filter>
+    <filter-name>auth</filter-name>
+    <filter-class>org.tamacat.monitor.web.filter.AuthFilter</filter-class>
+  </filter>
+  <filter-mapping>
+    <filter-name>securityHeaders</filter-name>
+    <url-pattern>/*</url-pattern>
+    <dispatcher>REQUEST</dispatcher>
+    <dispatcher>ERROR</dispatcher>
+  </filter-mapping>
+  <filter-mapping>
+    <filter-name>csrf</filter-name>
+    <url-pattern>/*</url-pattern>
+  </filter-mapping>
+  <filter-mapping>
+    <filter-name>auth</filter-name>
+    <url-pattern>/*</url-pattern>
+  </filter-mapping>
+
+  <!--
+    No <security-constraint>: Tomcat Secure Embed (tamacat-httpd 1.7) has no container-managed
+    security and refuses to start a context that declares one. Authentication and authorization
+    are implemented in application Filters. WEB-INF/ is never served directly (Servlet spec).
+  -->
+
+  <error-page>
+    <error-code>404</error-code>
+    <location>/WEB-INF/jsp/error.jsp</location>
+  </error-page>
+  <error-page>
+    <error-code>500</error-code>
+    <location>/WEB-INF/jsp/error.jsp</location>
+  </error-page>
+</web-app>

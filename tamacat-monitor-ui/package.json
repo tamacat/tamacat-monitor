@@ -1,0 +1,25 @@
+{
+  "name": "tamacat-monitor-ui",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cloudscape page bundles for tamacat-monitor",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit && node build.mjs"
+  },
+  "dependencies": {
+    "@cloudscape-design/collection-hooks": "1.0.111",
+    "@cloudscape-design/components": "3.0.1421",
+    "@cloudscape-design/global-styles": "1.0.72",
+    "qrcode-generator": "2.0.4",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "esbuild": "0.28.2",
+    "typescript": "7.0.2"
+  }
+}

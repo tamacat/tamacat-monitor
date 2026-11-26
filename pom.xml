@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>org.tamacat.monitor</groupId>
+  <artifactId>tamacat-monitor-parent</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+  <packaging>pom</packaging>
+  <name>tamacat-monitor</name>
+  <description>tamacat-monitor for Zabbix: manages several Zabbix servers (6.0 / 7.0 / 8.0) from one web console. An unofficial third-party product, not affiliated with Zabbix LLC.</description>
+  <url>https://github.com/tamacat/tamacat-monitor</url>
+
+  <licenses>
+    <license>
+      <name>Apache License, Version 2.0</name>
+      <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+
+  <scm>
+    <url>https://github.com/tamacat/tamacat-monitor</url>
+    <connection>scm:git:https://github.com/tamacat/tamacat-monitor.git</connection>
+  </scm>
+
+  <modules>
+    <module>tamacat-monitor-dao</module>
+    <module>tamacat-monitor-core</module>
+    <module>tamacat-monitor-zabbix</module>
+    <module>tamacat-monitor-ui</module>
+    <module>tamacat-monitor-admin</module>
+  </modules>
+
+  <properties>
+    <maven.compiler.release>25</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+    <!-- Runtime: keep this list short. Every addition needs a reason in docs/DESIGN.md. -->
+    <slf4j.version>2.0.20</slf4j.version>
+    <tamacat-logging.version>1.0.0</tamacat-logging.version>
+    <mysql-connector.version>26.7.0</mysql-connector.version>
+    <jakarta-json-api.version>2.1.3</jakarta-json-api.version>
+    <parsson.version>1.1.9</parsson.version>
+    <jstl-api.version>3.0.2</jstl-api.version>
+    <jstl-impl.version>3.0.1</jstl-impl.version>
+
+    <!-- Provided by tamacat-httpd 1.7 (Tomcat Embedded 11.0.29) -->
+    <servlet-api.version>6.1.0</servlet-api.version>
+    <jsp-api.version>4.0.0</jsp-api.version>
+
+    <!-- Test only -->
+    <junit.version>6.1.3</junit.version>
+    <h2.version>2.3.232</h2.version>
+  </properties>
+
+  <repositories>
+    <repository>
+      <id>tamacat.org</id>
+      <url>https://raw.github.com/tamacat/tamacat.github.io/mvn-repo/</url>
+      <releases><enabled>true</enabled></releases>
+      <snapshots><enabled>false</enabled></snapshots>
+    </repository>
+  </repositories>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.tamacat.monitor</groupId>
+        <artifactId>tamacat-monitor-dao</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.tamacat.monitor</groupId>
+        <artifactId>tamacat-monitor-core</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.tamacat.monitor</groupId>
+        <artifactId>tamacat-monitor-zabbix</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>slf4j-api</artifactId>
+        <version>${slf4j.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.tamacat</groupId>
+        <artifactId>tamacat-logging</artifactId>
+        <version>${tamacat-logging.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.mysql</groupId>
+        <artifactId>mysql-connector-j</artifactId>
+        <version>${mysql-connector.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>jakarta.json</groupId>
+        <artifactId>jakarta.json-api</artifactId>
+        <version>${jakarta-json-api.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.parsson</groupId>
+        <artifactId>parsson</artifactId>
+        <version>${parsson.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>jakarta.servlet</groupId>
+        <artifactId>jakarta.servlet-api</artifactId>
+        <version>${servlet-api.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>jakarta.servlet.jsp</groupId>
+        <artifactId>jakarta.servlet.jsp-api</artifactId>
+        <version>${jsp-api.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>jakarta.servlet.jsp.jstl</groupId>
+        <artifactId>jakarta.servlet.jsp.jstl-api</artifactId>
+        <version>${jstl-api.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.glassfish.web</groupId>
+        <artifactId>jakarta.servlet.jsp.jstl</artifactId>
+        <version>${jstl-impl.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.junit.jupiter</groupId>
+        <artifactId>junit-jupiter</artifactId>
+        <version>${junit.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.h2database</groupId>
+        <artifactId>h2</artifactId>
+        <version>${h2.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-compiler-plugin</artifactId>
+          <version>3.15.0</version>
+          <configuration>
+            <release>${maven.compiler.release}</release>
+            <compilerArgs>
+              <arg>-Xlint:all,-serial,-processing</arg>
+            </compilerArgs>
+          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-surefire-plugin</artifactId>
+          <version>3.5.4</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-jar-plugin</artifactId>
+          <version>3.4.2</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-war-plugin</artifactId>
+          <version>3.4.0</version>
+        </plugin>
+        <plugin>
+          <groupId>org.cyclonedx</groupId>
+          <artifactId>cyclonedx-maven-plugin</artifactId>
+          <version>2.7.9</version>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+  </build>
+
+  <profiles>
+    <!-- mvn -Psbom package : writes a CycloneDX SBOM (target/bom.json) for vulnerability scanning -->
+    <profile>
+      <id>sbom</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.cyclonedx</groupId>
+            <artifactId>cyclonedx-maven-plugin</artifactId>
+            <inherited>false</inherited>
+            <executions>
+              <execution>
+                <phase>package</phase>
+                <goals><goal>makeAggregateBom</goal></goals>
+              </execution>
+            </executions>
+            <configuration>
+              <outputFormat>json</outputFormat>
+              <includeTestScope>false</includeTestScope>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
+</project>

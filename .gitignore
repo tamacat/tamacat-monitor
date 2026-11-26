@@ -1,0 +1,25 @@
+# Maven
+target/
+
+# Node / UI build
+node_modules/
+tamacat-monitor-ui/dist/
+
+# IDE
+bin/
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local secrets / env
+.env
+*.local.properties
+docker/secrets/*
+!docker/secrets/.gitkeep

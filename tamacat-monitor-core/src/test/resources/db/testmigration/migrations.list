@@ -1,0 +1,3 @@
+# test migrations
+V002__add_b.sql
+V001__create_a.sql

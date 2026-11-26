@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: corretto
+          java-version: '25'
+          cache: maven
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: tamacat-monitor-ui/package-lock.json
+      - name: Audit UI runtime dependencies
+        working-directory: tamacat-monitor-ui
+        run: npm audit --omit=dev --audit-level=moderate
+      - name: Build and test
+        run: mvn -B -ntp verify
+      - name: SBOM (CycloneDX)
+        run: mvn -B -ntp -Psbom -DskipTests package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: target/bom.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tmon-war
+          path: tamacat-monitor-admin/target/monitor.war
+
+  # Fails a pull request that adds a dependency with a known vulnerability
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: moderate

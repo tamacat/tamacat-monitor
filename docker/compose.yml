@@ -1,0 +1,198 @@
+# Development environment for tamacat-monitor. See docker/README.md.
+#
+#   docker compose -f docker/compose.yml up -d --build                     # monitor + central DB
+#   docker compose -f docker/compose.yml --profile zabbix up -d            # + Zabbix 6.0 / 7.0 / 8.0 for testing
+#
+# Not for production: Zabbix test containers use fixed passwords and plain HTTP is used.
+name: tamacat-monitor
+
+services:
+  # ---- central DB (tmon) ----
+  monitor-db:
+    image: mysql:8.4
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_bin
+    environment:
+      MYSQL_DATABASE: tmon
+      MYSQL_USER: tmon
+      MYSQL_PASSWORD_FILE: /run/secrets/tmon_db_password
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/mysql_root_password
+    secrets: [tmon_db_password, mysql_root_password]
+    volumes:
+      - monitor-db:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "--silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  # ---- monitor (tamacat-httpd 1.7 + monitor.war) ----
+  monitor:
+    build:
+      context: ..
+      dockerfile: docker/monitor/Dockerfile
+      args:
+        HTTPD_IMAGE: ${HTTPD_IMAGE:-docker.io/tamacat/tamacat-httpd:1.7}
+    depends_on:
+      monitor-db:
+        condition: service_healthy
+    ports:
+      # keep the same port number on both sides: tamacat-httpd 1.7 corrupts the Host header
+      # ("host:8080:18090") when they differ
+      - "127.0.0.1:8080:8080"
+    environment:
+      TMON_DB_URL: jdbc:mysql://monitor-db:3306/tmon
+      TMON_DB_USER: tmon
+      TMON_DB_PASSWORD_FILE: /run/secrets/tmon_db_password
+      # AES-256 key for Zabbix DB passwords stored in the central DB (openssl rand -base64 32)
+      TMON_SECRET_KEY_FILE: /run/secrets/tmon_secret_key
+      # initial administrator "admin", created only while no user exists; must be changed at first sign-in
+      TMON_ADMIN_INITIAL_PASSWORD_FILE: /run/secrets/tmon_admin_password
+      # plain HTTP in development only; keep the default (true) behind TLS
+      TMON_SESSION_COOKIE_SECURE: "false"
+      # passkeys: the RP ID is the host name of the tamacat-monitor URL (an IP address cannot be used:
+      # open http://localhost:8080/monitor/, not 127.0.0.1); origins as the browser sends them
+      TMON_WEBAUTHN_RP_ID: localhost
+      TMON_WEBAUTHN_ORIGINS: http://localhost:8080
+      TAMACAT_LOG_FORMAT: text
+    secrets: [tmon_db_password, tmon_secret_key, tmon_admin_password]
+
+  # ---- Zabbix 6.0 (test only; custom build tamacat/*:6.0-latest) ----
+  zabbix60-db:
+    profiles: [zabbix]
+    image: mysql:8.0
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_bin
+      - --log-bin-trust-function-creators=1
+    environment:
+      MYSQL_DATABASE: zabbix
+      MYSQL_USER: zabbix
+      MYSQL_PASSWORD: zabbix
+      MYSQL_ROOT_PASSWORD: zabbix-root
+    volumes:
+      - zabbix60-db:/var/lib/mysql
+      # the custom server image does not create the schema: loaded once into an empty volume
+      - ./zabbix-init:/docker-entrypoint-initdb.d:ro
+      - ${ZABBIX60_SCHEMA_DIR:-../../zabbix-6.0-custom/sources/zabbix-6.0.49/database/mysql}:/zabbix-schema-src:ro
+  zabbix60-server:
+    profiles: [zabbix]
+    image: docker.io/tamacat/zabbix-server-mysql:6.0-latest
+    depends_on: [zabbix60-db]
+    cap_add: [NET_RAW]   # fping; Podman does not grant NET_RAW by default
+    environment:
+      DB_SERVER_HOST: zabbix60-db
+      MYSQL_DATABASE: zabbix
+      MYSQL_USER: zabbix
+      MYSQL_PASSWORD: zabbix
+  zabbix60-web:
+    profiles: [zabbix]
+    image: docker.io/tamacat/zabbix-web-nginx-mysql:6.0-latest
+    depends_on: [zabbix60-server]
+    ports: ["127.0.0.1:18060:8080"]
+    environment:
+      DB_SERVER_HOST: zabbix60-db
+      MYSQL_DATABASE: zabbix
+      MYSQL_USER: zabbix
+      MYSQL_PASSWORD: zabbix
+      ZBX_SERVER_HOST: zabbix60-server
+      PHP_TZ: UTC
+
+  # ---- Zabbix 7.0 (test only; custom build tamacat/*:7.0-latest) ----
+  zabbix70-db:
+    profiles: [zabbix]
+    image: mysql:8.4
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_bin
+      - --log-bin-trust-function-creators=1
+    environment:
+      MYSQL_DATABASE: zabbix
+      MYSQL_USER: zabbix
+      MYSQL_PASSWORD: zabbix
+      MYSQL_ROOT_PASSWORD: zabbix-root
+    volumes:
+      - zabbix70-db:/var/lib/mysql
+      # the custom server image does not create the schema: loaded once into an empty volume
+      - ./zabbix-init:/docker-entrypoint-initdb.d:ro
+      - ${ZABBIX70_SCHEMA_DIR:-../../zabbix-7.0-custom/sources/zabbix-7.0.32/database/mysql}:/zabbix-schema-src:ro
+  zabbix70-server:
+    profiles: [zabbix]
+    image: docker.io/tamacat/zabbix-server-mysql:7.0-latest
+    depends_on: [zabbix70-db]
+    cap_add: [NET_RAW]   # fping; Podman does not grant NET_RAW by default
+    environment:
+      DB_SERVER_HOST: zabbix70-db
+      MYSQL_DATABASE: zabbix
+      MYSQL_USER: zabbix
+      MYSQL_PASSWORD: zabbix
+  zabbix70-web:
+    profiles: [zabbix]
+    image: docker.io/tamacat/zabbix-web-nginx-mysql:7.0-latest
+    depends_on: [zabbix70-server]
+    ports: ["127.0.0.1:18070:8080"]
+    environment:
+      DB_SERVER_HOST: zabbix70-db
+      MYSQL_DATABASE: zabbix
+      MYSQL_USER: zabbix
+      MYSQL_PASSWORD: zabbix
+      ZBX_SERVER_HOST: zabbix70-server
+      PHP_TZ: UTC
+
+  # ---- Zabbix 8.0 (test only; custom build tamacat/*:8.0-latest) ----
+  zabbix80-db:
+    profiles: [zabbix]
+    image: mysql:8.4
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_bin
+      - --log-bin-trust-function-creators=1
+    environment:
+      MYSQL_DATABASE: zabbix
+      MYSQL_USER: zabbix
+      MYSQL_PASSWORD: zabbix
+      MYSQL_ROOT_PASSWORD: zabbix-root
+    volumes:
+      - zabbix80-db:/var/lib/mysql
+      # the custom server image does not create the schema: loaded once into an empty volume
+      - ./zabbix-init:/docker-entrypoint-initdb.d:ro
+      - ${ZABBIX80_SCHEMA_DIR:-../../zabbix-8.0-custom/sources/zabbix-8.0.0/database/mysql}:/zabbix-schema-src:ro
+  zabbix80-server:
+    profiles: [zabbix]
+    image: docker.io/tamacat/zabbix-server-mysql:8.0-latest
+    depends_on: [zabbix80-db]
+    cap_add: [NET_RAW]   # fping; Podman does not grant NET_RAW by default
+    environment:
+      DB_SERVER_HOST: zabbix80-db
+      MYSQL_DATABASE: zabbix
+      MYSQL_USER: zabbix
+      MYSQL_PASSWORD: zabbix
+  zabbix80-web:
+    profiles: [zabbix]
+    image: docker.io/tamacat/zabbix-web-nginx-mysql:8.0-latest
+    depends_on: [zabbix80-server]
+    ports: ["127.0.0.1:18080:8080"]
+    environment:
+      DB_SERVER_HOST: zabbix80-db
+      MYSQL_DATABASE: zabbix
+      MYSQL_USER: zabbix
+      MYSQL_PASSWORD: zabbix
+      ZBX_SERVER_HOST: zabbix80-server
+      PHP_TZ: UTC
+
+secrets:
+  tmon_db_password:
+    file: ./secrets/tmon_db_password.txt
+  mysql_root_password:
+    file: ./secrets/mysql_root_password.txt
+  tmon_secret_key:
+    file: ./secrets/tmon_secret_key.txt
+  tmon_admin_password:
+    file: ./secrets/tmon_admin_password.txt
+
+volumes:
+  monitor-db:
+  zabbix60-db:
+  zabbix70-db:
+  zabbix80-db:

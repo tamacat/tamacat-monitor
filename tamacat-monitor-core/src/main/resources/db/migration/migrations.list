@@ -1,0 +1,5 @@
+# Central DB migrations, applied in version order. Never edit an applied script; add a new one.
+V001__init_schema.sql
+V002__user_password_change.sql
+V003__user_mfa.sql
+V004__user_passkeys.sql

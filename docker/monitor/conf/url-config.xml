@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<service-config>
+  <service>
+    <!-- htdocs/root/check.html is used by the image HEALTHCHECK -->
+    <url path="/" type="normal" handler="RootHandler" />
+
+    <!-- webapps/monitor.war -->
+    <url path="/monitor/" type="normal" handler="TomcatHandler" components="tomcat/components.xml" />
+  </service>
+</service-config>
