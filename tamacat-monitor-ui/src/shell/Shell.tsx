@@ -62,6 +62,7 @@ function navigationItems(): SideNavigationProps.Item[] {
       items: [
         { type: 'link', text: t('nav.problems'), href: url('/problems') },
         { type: 'link', text: t('nav.hosts'), href: url('/hosts') },
+        { type: 'link', text: t('nav.latest'), href: url('/latest') },
         { type: 'link', text: t('nav.hostgroups'), href: url('/hostgroups') },
         { type: 'link', text: t('nav.items'), href: url('/items') },
         { type: 'link', text: t('nav.alerts'), href: url('/alerts') },

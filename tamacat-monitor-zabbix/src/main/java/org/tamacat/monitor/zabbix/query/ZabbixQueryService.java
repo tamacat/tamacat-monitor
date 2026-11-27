@@ -1,6 +1,7 @@
 package org.tamacat.monitor.zabbix.query;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -32,8 +33,10 @@ import org.tamacat.monitor.zabbix.access.AccessResolver.Assignments;
 import org.tamacat.monitor.zabbix.access.AccessScope;
 import org.tamacat.monitor.zabbix.reader.ActionReader;
 import org.tamacat.monitor.zabbix.reader.AlertReader;
+import org.tamacat.monitor.zabbix.reader.HistoryReader;
 import org.tamacat.monitor.zabbix.reader.HostReader;
 import org.tamacat.monitor.zabbix.reader.ItemReader;
+import org.tamacat.monitor.zabbix.reader.LatestDataReader;
 import org.tamacat.monitor.zabbix.reader.ProblemReader;
 
 /**
@@ -107,6 +110,30 @@ public final class ZabbixQueryService {
 
 	public List<ItemReader.ItemSummary> items(User user, long serverId, ItemReader.ItemQuery q) {
 		return onServer(user, serverId, c -> new ItemReader(c.schema()).search(c.db(), c.scope(), q));
+	}
+
+	public List<LatestDataReader.LatestRow> latest(User user, long serverId, LatestDataReader.LatestQuery q) {
+		return onServer(user, serverId, c -> new LatestDataReader(c.schema()).search(c.db(), c.scope(), q));
+	}
+
+	/** Items and their values in a period (history log). */
+	public record HistoryResult(List<HistoryReader.ItemRef> items, List<HistoryReader.HistoryRow> rows) {
+	}
+
+	public HistoryResult history(User user, long serverId, HistoryReader.HistoryQuery q) {
+		HistoryReader.validate(q.from(), q.to(), HistoryReader.MAX_HISTORY_PERIOD);
+		return onServer(user, serverId, c -> {
+			HistoryReader r = new HistoryReader(c.schema());
+			var items = r.items(c.db(), c.scope(), q.itemIds());
+			return new HistoryResult(items, r.history(c.db(), items, q));
+		});
+	}
+
+	public List<HistoryReader.Series> graph(User user, long serverId, HistoryReader.GraphQuery q) {
+		return onServer(user, serverId, c -> {
+			HistoryReader r = new HistoryReader(c.schema());
+			return r.graph(c.db(), r.items(c.db(), c.scope(), q.itemIds()), q, Instant.now());
+		});
 	}
 
 	public List<ServerResult<ProblemReader.ProblemRow>> problems(User user, Collection<Long> serverIds,

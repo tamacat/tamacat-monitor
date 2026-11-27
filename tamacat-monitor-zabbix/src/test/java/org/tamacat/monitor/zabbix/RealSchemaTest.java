@@ -25,8 +25,10 @@ import org.tamacat.monitor.zabbix.access.AccessResolver.Assignments;
 import org.tamacat.monitor.zabbix.access.AccessScope;
 import org.tamacat.monitor.zabbix.reader.ActionReader;
 import org.tamacat.monitor.zabbix.reader.AlertReader;
+import org.tamacat.monitor.zabbix.reader.HistoryReader;
 import org.tamacat.monitor.zabbix.reader.HostReader;
 import org.tamacat.monitor.zabbix.reader.ItemReader;
+import org.tamacat.monitor.zabbix.reader.LatestDataReader;
 import org.tamacat.monitor.zabbix.reader.ProblemReader;
 
 /**
@@ -121,6 +123,43 @@ class RealSchemaTest {
 		assertTrue(new ItemReader(schema).search(db, AccessScope.of(Set.of(G_CHILD)),
 				new ItemReader.ItemQuery(zabbixServerId, null, null, page)).isEmpty());
 		new ItemReader(schema).search(db, AccessScope.ALL, new ItemReader.ItemQuery(null, "cpu", 0, Page.first(20)));
+
+		// latest data, history log, graphs (the Zabbix server's internal items have history)
+		var latest = new LatestDataReader(schema).search(db, AccessScope.ALL,
+				new LatestDataReader.LatestQuery(null, zabbixServerId, null, null, Page.first(200)));
+		assertFalse(latest.isEmpty());
+		var withData = latest.stream().filter(l -> l.lastValue() != null && (l.valueType() == 0 || l.valueType() == 3)).toList();
+		assertFalse(withData.isEmpty(), "numeric items with values");
+		new LatestDataReader(schema).search(db, AccessScope.ALL, new LatestDataReader.LatestQuery(G_CHILD, null, "cpu", "component",
+				Page.first(20)));
+		assertTrue(new LatestDataReader(schema).search(db, AccessScope.of(Set.of(G_CHILD)),
+				new LatestDataReader.LatestQuery(null, zabbixServerId, null, null, page)).isEmpty());
+		HistoryReader hr = new HistoryReader(schema);
+		var item = withData.get(0);
+		var refs = hr.items(db, AccessScope.ALL, List.of(item.itemId()));
+		Instant hNow = Instant.now();
+		var rows = hr.history(db, refs, new HistoryReader.HistoryQuery(List.of(item.itemId()), hNow.minus(Duration.ofDays(1)),
+				hNow.plusSeconds(60), null, false, null, null, Page.first(100)));
+		assertFalse(rows.isEmpty());
+		assertEquals(item.lastValue(), rows.get(0).value(), "newest value first");
+		assertTrue(hr.history(db, refs, new HistoryReader.HistoryQuery(List.of(item.itemId()), hNow.minus(Duration.ofDays(1)),
+				hNow.plusSeconds(60), "no-such-text", false, null, null, Page.first(100))).isEmpty(), "text filter skips numbers");
+		hr.history(db, refs, new HistoryReader.HistoryQuery(List.of(item.itemId()), hNow.minus(Duration.ofDays(1)), hNow,
+				null, false, java.math.BigDecimal.ZERO, java.math.BigDecimal.TEN, Page.first(10)));
+		var graph = hr.graph(db, refs, new HistoryReader.GraphQuery(List.of(item.itemId()), hNow.minus(Duration.ofDays(1)),
+				hNow.plusSeconds(60), HistoryReader.Source.HISTORY, 100), hNow);
+		assertEquals("history", graph.get(0).source());
+		assertFalse(graph.get(0).points().isEmpty());
+		assertTrue(graph.get(0).points().size() <= 100);
+		hr.graph(db, refs, new HistoryReader.GraphQuery(List.of(item.itemId()), hNow.minus(Duration.ofDays(60)), hNow,
+				HistoryReader.Source.AUTO, 500), hNow); // trends
+		latest.stream().filter(l -> l.valueType() == 1 || l.valueType() == 4).findFirst().ifPresent(text -> {
+			var tr = hr.items(db, AccessScope.ALL, List.of(text.itemId()));
+			hr.history(db, tr, new HistoryReader.HistoryQuery(List.of(text.itemId()), hNow.minus(Duration.ofDays(1)), hNow,
+					"a", true, null, null, Page.first(10)));
+		});
+		org.junit.jupiter.api.Assertions.assertThrows(org.tamacat.monitor.common.NotFoundException.class,
+				() -> hr.items(db, AccessScope.of(Set.of(G_CHILD)), List.of(item.itemId())), "out of scope");
 
 		// problems
 		new ProblemReader().search(db, AccessScope.ALL, new ProblemReader.ProblemQuery(null, null, null, null, page));

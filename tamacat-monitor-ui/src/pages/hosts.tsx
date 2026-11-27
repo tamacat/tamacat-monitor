@@ -213,7 +213,7 @@ function HostDetailPage({ serverId, hostId }: { serverId: number; hostId: number
                 { id: 'delete', text: t('action.delete') },
               ] : []}
               onItemClick={(id) => setDialog(id === 'templates' ? { kind: 'templates', serverId, host: h } : { kind: 'delete', serverId, serverName: server?.name ?? '', host: h })}
-              extra={<Button href={url(`/items?server=${serverId}&host=${hostId}`)}>{t('host.showItems')}</Button>}
+              extra={<><Button href={url(`/latest?server=${serverId}&host=${hostId}`)}>{t('host.showLatest')}</Button><Button href={url(`/items?server=${serverId}&host=${hostId}`)}>{t('host.showItems')}</Button></>}
               primary={canWrite && <Button variant="primary" onClick={() => setDialog(editDialog(serverId, detail))}>{t('action.edit')}</Button>}
             />
           )}

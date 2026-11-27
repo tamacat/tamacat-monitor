@@ -18,6 +18,7 @@ import { WriteDialog } from '../components/WriteDialog';
 import { api, errorText } from '../lib/api';
 import { formatDateTime, hasRole, t, url } from '../lib/boot';
 import { mount } from '../lib/mount';
+import { historyHref } from '../lib/values';
 import { hostHref, itemHref, label, query, type ServerRef } from '../lib/zabbix';
 import { flashNextPage, Shell, useFlash } from '../shell/Shell';
 
@@ -202,7 +203,7 @@ function ItemDetailPage({ serverId, itemId }: { serverId: number; itemId: number
             <ActionsMenu
               items={canWrite ? [{ id: 'delete', text: t('action.delete') }] : []}
               onItemClick={() => setDialog({ kind: 'delete', serverId, item: i })}
-              extra={<Button href={hostHref(serverId, i.hostId)}>{t('item.showHost')}</Button>}
+              extra={<>{i.status === 0 && (i.valueType === 0 || i.valueType === 3) && <Button href={historyHref(serverId, [i.itemId], 'graph')}>{t('latest.graph')}</Button>}{i.status === 0 && <Button href={historyHref(serverId, [i.itemId], 'values')}>{t('latest.history')}</Button>}<Button href={hostHref(serverId, i.hostId)}>{t('item.showHost')}</Button></>}
               primary={canWrite && <Button variant="primary" onClick={() => setDialog(editDialog(serverId, d))}>{t('action.edit')}</Button>}
             />
           )}

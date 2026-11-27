@@ -3,7 +3,7 @@
 import * as esbuild from 'esbuild';
 import { rmSync, writeFileSync } from 'node:fs';
 
-const pages = ['login', 'home', 'account', 'users', 'servers', 'problems', 'hosts', 'hostgroups', 'items', 'alerts', 'actions', 'server'];
+const pages = ['login', 'home', 'account', 'users', 'servers', 'problems', 'hosts', 'hostgroups', 'items', 'alerts', 'actions', 'server', 'latest', 'history'];
 rmSync('dist', { recursive: true, force: true });
 
 const result = await esbuild.build({
