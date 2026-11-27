@@ -23,7 +23,7 @@ import org.tamacat.monitor.web.WebSession;
  * (user, CSRF token, locale, messages).
  */
 @WebServlet(urlPatterns = { "", "/login", "/users", "/servers", "/account", "/problems", "/hosts", "/hostgroups", "/items",
-		"/alerts", "/actions", "/server" })
+		"/alerts", "/actions", "/server", "/latest", "/history" })
 public class PageServlet extends HttpServlet {
 
 	private static final long serialVersionUID = 1L;
@@ -43,6 +43,8 @@ public class PageServlet extends HttpServlet {
 			Map.entry("/hosts", new PageDef("hosts", "nav.hosts", null)),
 			Map.entry("/hostgroups", new PageDef("hostgroups", "nav.hostgroups", null)),
 			Map.entry("/items", new PageDef("items", "nav.items", null)),
+			Map.entry("/latest", new PageDef("latest", "nav.latest", null)),
+			Map.entry("/history", new PageDef("history", "nav.history", null)),
 			Map.entry("/alerts", new PageDef("alerts", "nav.alerts", null)),
 			Map.entry("/actions", new PageDef("actions", "nav.actions", null)),
 			// P3: per-server dashboard (?id=); data limited by the API

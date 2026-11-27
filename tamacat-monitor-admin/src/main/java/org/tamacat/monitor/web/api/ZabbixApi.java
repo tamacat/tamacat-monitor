@@ -24,8 +24,10 @@ import org.tamacat.monitor.zabbix.query.ZabbixQueryService;
 import org.tamacat.monitor.zabbix.query.ZabbixQueryService.ServerResult;
 import org.tamacat.monitor.zabbix.reader.ActionReader;
 import org.tamacat.monitor.zabbix.reader.AlertReader;
+import org.tamacat.monitor.zabbix.reader.HistoryReader;
 import org.tamacat.monitor.zabbix.reader.HostReader;
 import org.tamacat.monitor.zabbix.reader.ItemReader;
+import org.tamacat.monitor.zabbix.reader.LatestDataReader;
 import org.tamacat.monitor.zabbix.reader.ProblemReader;
 
 /**
@@ -40,6 +42,10 @@ import org.tamacat.monitor.zabbix.reader.ProblemReader;
  * GET /api/zabbix/servers/{id}/hostgroups/{groupId}
  * GET /api/zabbix/servers/{id}/hosts/{hostId}
  * GET /api/zabbix/servers/{id}/items?host=&amp;q=&amp;status=&amp;limit=&amp;offset=
+ * GET /api/zabbix/servers/{id}/latest?group=&amp;host=&amp;q=&amp;tag=&amp;limit=&amp;offset=   latest data (last two values)
+ * GET /api/zabbix/servers/{id}/history?item=&amp;from=&amp;to=&amp;q=&amp;exclude=&amp;min=&amp;max=&amp;limit=&amp;offset=
+ *                                                         history log (item may repeat; at most 31 days)
+ * GET /api/zabbix/servers/{id}/graph?item=&amp;from=&amp;to=&amp;source=auto|history|trends&amp;points=
  * GET /api/zabbix/servers/{id}/actions?eventsource=&amp;q=      (server administrators)
  * GET /api/zabbix/servers/{id}/actions/{actionId}          (server administrators)
  * </pre>
@@ -87,6 +93,20 @@ public class ZabbixApi extends ApiServlet {
 				var items = zabbix().items(user, serverId, new ItemReader.ItemQuery(longParam(req, "host"), str(req, "q"),
 						intParam(req, "status"), page(req, ItemReader.MAX_PAGE)));
 				ApiSupport.write(res, 200, ApiSupport.array(items, ZabbixApi::item));
+				return;
+			}
+			if (seg.length == 3 && seg[2].equals("latest")) {
+				var rows = zabbix().latest(user, serverId, new LatestDataReader.LatestQuery(longParam(req, "group"),
+						longParam(req, "host"), str(req, "q"), str(req, "tag"), page(req, LatestDataReader.MAX_PAGE)));
+				ApiSupport.write(res, 200, ApiSupport.array(rows, ZabbixApi::latest));
+				return;
+			}
+			if (seg.length == 3 && seg[2].equals("history")) {
+				history(req, res, user, serverId);
+				return;
+			}
+			if (seg.length == 3 && seg[2].equals("graph")) {
+				graph(req, res, user, serverId);
 				return;
 			}
 			if (seg.length == 4 && seg[2].equals("items")) {
@@ -402,6 +422,74 @@ public class ZabbixApi extends ApiServlet {
 		}
 	}
 
+	// ---- collected values ----
+
+	private void history(HttpServletRequest req, HttpServletResponse res, User user, long serverId) throws IOException {
+		Instant to = instant(req, "to", Instant.now());
+		var r = zabbix().history(user, serverId, new HistoryReader.HistoryQuery(itemIds(req),
+				instant(req, "from", to.minus(Duration.ofHours(1))), to, str(req, "q"), Boolean.TRUE.equals(boolParam(req, "exclude")),
+				decimalParam(req, "min"), decimalParam(req, "max"), page(req, HistoryReader.MAX_PAGE)));
+		JsonArrayBuilder rows = Json.createArrayBuilder();
+		for (var h : r.rows()) {
+			JsonObjectBuilder b = Json.createObjectBuilder().add("itemId", h.itemId()).add("clock", h.clock().toString())
+					.add("ns", h.ns());
+			nullable(b, "value", h.value());
+			if (h.logEventId() != null) {
+				nullable(b, "logTime", h.logTime() == null ? null : h.logTime().toString());
+				b.add("source", nz(h.source())).add("severity", h.severity()).add("logEventId", h.logEventId());
+			}
+			rows.add(b);
+		}
+		ApiSupport.write(res, 200, Json.createObjectBuilder().add("items", ApiSupport.array(r.items(), ZabbixApi::itemRef))
+				.add("rows", rows).build());
+	}
+
+	/** Series points are [epoch seconds, min, avg, max]. */
+	private void graph(HttpServletRequest req, HttpServletResponse res, User user, long serverId) throws IOException {
+		Instant to = instant(req, "to", Instant.now());
+		Integer points = intParam(req, "points");
+		var series = zabbix().graph(user, serverId, new HistoryReader.GraphQuery(itemIds(req),
+				instant(req, "from", to.minus(Duration.ofHours(1))), to, HistoryReader.Source.of(str(req, "source")),
+				points == null ? 500 : points));
+		JsonArrayBuilder arr = Json.createArrayBuilder();
+		for (var s : series) {
+			JsonArrayBuilder pts = Json.createArrayBuilder();
+			s.points().forEach(p -> pts.add(Json.createArrayBuilder().add(p.clock().getEpochSecond()).add(num(p.min()))
+					.add(num(p.avg())).add(num(p.max()))));
+			arr.add(Json.createObjectBuilder().add("item", itemRef(s.item())).add("source", s.source())
+					.add("bucket", s.bucket()).add("points", pts));
+		}
+		ApiSupport.write(res, 200, Json.createObjectBuilder().add("series", arr).build());
+	}
+
+	/** "item" parameters (repeated or comma-separated), at most HistoryReader.MAX_ITEMS. */
+	private static List<Long> itemIds(HttpServletRequest req) {
+		Set<Long> ids = new LinkedHashSet<>();
+		String[] values = req.getParameterValues("item");
+		if (values != null) {
+			for (String v : values) {
+				for (String part : v.split(",")) {
+					if (!part.isBlank()) {
+						ids.add(parseLong(part.strip()));
+					}
+				}
+			}
+		}
+		if (ids.isEmpty() || ids.size() > HistoryReader.MAX_ITEMS) {
+			throw new BadRequestException("item");
+		}
+		return List.copyOf(ids);
+	}
+
+	private static java.math.BigDecimal decimalParam(HttpServletRequest req, String name) {
+		String v = str(req, name);
+		try {
+			return v == null ? null : new java.math.BigDecimal(v.strip());
+		} catch (NumberFormatException e) {
+			throw new BadRequestException(name);
+		}
+	}
+
 	private static Page page(HttpServletRequest req, int maxLimit) {
 		Integer limit = intParam(req, "limit");
 		Integer offset = intParam(req, "offset");
@@ -479,6 +567,30 @@ public class ZabbixApi extends ApiServlet {
 		nullable(b, "lastClock", i.lastClock() == null ? null : i.lastClock().toString());
 		nullable(b, "lastValue", i.lastValue());
 		return b;
+	}
+
+	private static JsonObjectBuilder latest(LatestDataReader.LatestRow i) {
+		JsonArrayBuilder tags = Json.createArrayBuilder();
+		i.tags().forEach(t -> tags.add(Json.createObjectBuilder().add("tag", t.tag()).add("value", nz(t.value()))));
+		JsonObjectBuilder b = Json.createObjectBuilder().add("itemId", i.itemId()).add("hostId", i.hostId())
+				.add("host", i.host()).add("hostName", i.hostName()).add("name", i.name()).add("key", i.key())
+				.add("valueType", i.valueType()).add("units", nz(i.units())).add("delay", nz(i.delay())).add("state", i.state())
+				.add("error", nz(i.error())).add("tags", tags);
+		nullable(b, "lastClock", i.lastClock() == null ? null : i.lastClock().toString());
+		nullable(b, "lastValue", i.lastValue());
+		nullable(b, "prevValue", i.prevValue());
+		return b;
+	}
+
+	private static JsonObjectBuilder itemRef(HistoryReader.ItemRef i) {
+		return Json.createObjectBuilder().add("itemId", i.itemId()).add("hostId", i.hostId()).add("host", i.host())
+				.add("hostName", i.hostName()).add("name", i.name()).add("key", i.key()).add("valueType", i.valueType())
+				.add("units", nz(i.units()));
+	}
+
+	/** A finite number, or JSON null. */
+	private static jakarta.json.JsonValue num(double d) {
+		return Double.isFinite(d) ? Json.createValue(d) : jakarta.json.JsonValue.NULL;
 	}
 
 	private static JsonObjectBuilder problem(ProblemReader.ProblemRow p) {
